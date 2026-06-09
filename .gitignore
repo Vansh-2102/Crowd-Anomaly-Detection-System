@@ -1,0 +1,22 @@
+# Datasets
+**/datasets/
+**/data/
+*.zip
+*.sh
+
+# Models and Weights
+**/trained_models/
+*.pt
+*.h5
+*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
