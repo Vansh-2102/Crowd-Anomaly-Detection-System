@@ -10,3 +10,8 @@ torch
 torchvision
 joblib
 scipy
+fastapi
+uvicorn[standard]
+python-multipart
+python-telegram-bot==21.7
+python-dotenv

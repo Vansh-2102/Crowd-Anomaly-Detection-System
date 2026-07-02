@@ -17,7 +17,8 @@ crowd-anomaly-ml/
 │   ├── motion/           # Optical flow and stampede detection
 │   ├── violence/         # Violence detection (CNN-LSTM)
 │   ├── decision/         # Alert decision engine
-│   └── main.py           # Main pipeline
+│   ├── main.py           # Main pipeline
+│   └── api.py            # FastAPI server
 ├── requirements.txt      # Python dependencies
 └── README.md             # This file
 ```
@@ -30,6 +31,7 @@ crowd-anomaly-ml/
 4. **Stampede Detection**: Uses Farneback Optical Flow to detect sudden mass directional movement.
 5. **Violence Detection**: A CNN-LSTM model trained on the RWF-2000 dataset.
 6. **Alert Engine**: A rule-based system to classify risk levels (SAFE, WARNING, DANGER, CRITICAL).
+7. **Telegram Alerts**: Sends real-time alerts with photos to a Telegram chat (configurable).
 
 ## Installation
 
@@ -37,6 +39,22 @@ crowd-anomaly-ml/
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
+   ```
+
+## Configuration
+
+### 1. Telegram Setup (Optional but Recommended)
+1. Create a Telegram bot using [@BotFather](https://t.me/BotFather) and get your bot token.
+2. Get your chat ID by sending a message to [@userinfobot](https://t.me/userinfobot).
+3. Copy `.env.example` to `.env` in the `crowd-anomaly-ml` directory:
+   ```bash
+   cp .env.example .env
+   ```
+4. Update the `.env` file with your credentials:
+   ```
+   TELEGRAM_BOT_TOKEN=your_bot_token_here
+   TELEGRAM_CHAT_ID=your_chat_id_here
+   TELEGRAM_ENABLED=true
    ```
 
 ## Dataset Instructions
@@ -66,8 +84,18 @@ To train the violence detection model:
 
 ## Usage
 
-Run the main pipeline:
+### Run the FastAPI Server
+```bash
+python src/api.py
+```
 
+The server will start at `http://localhost:8000` and includes:
+- `/docs`: Swagger UI for API documentation
+- `/health`: Health check endpoint
+- `/stream-camera`: Live video stream (SSE)
+- `/analyze-frame`: Analyze a single frame
+
+### Run the Main Pipeline (Legacy)
 ```bash
 # Using webcam
 python src/main.py --source 0
