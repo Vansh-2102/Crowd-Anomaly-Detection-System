@@ -130,7 +130,7 @@ const Navbar: React.FC<NavbarProps> = ({ collapsed, onCollapse }) => {
         <Dropdown
           menu={{ items: alertMenuItems }}
           trigger={['click']}
-          overlayInnerStyle={{ width: 320 }}
+          overlayStyle={{ width: 320 }}
         >
           <Badge count={unreadCount} overflowCount={99} size="small">
             <Button

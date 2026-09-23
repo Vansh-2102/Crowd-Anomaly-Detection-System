@@ -1,0 +1,8 @@
+# Pyrefly configuration
+python-interpreter-path = "C:/Users/vansh/anaconda3/python.exe"
+ignore-missing-imports = ["cv2", "cv2.*"]
+replace-imports-with-any = ["cv2", "cv2.*"]
+search-path = [
+    "crowd-anomaly-ml/src",
+    "crowd-anomaly-ml"
+]

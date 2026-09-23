@@ -2,7 +2,7 @@ import sys
 import os
 import base64
 import numpy as np
-import cv2
+import cv2  # type: ignore
 import traceback
 import time
 from datetime import datetime
@@ -89,10 +89,13 @@ async def health_check():
 
 async def send_telegram_alert(viz_frame, alert_data):
     """Send an alert to Telegram with the frame and details."""
+    global telegram_enabled, telegram_bot, telegram_chat_id
     if not telegram_enabled or not telegram_bot or not telegram_chat_id:
+        print(f"Telegram alert skipped: enabled={telegram_enabled}, bot={'present' if telegram_bot else 'None'}, chat_id={telegram_chat_id}")
         return
     
     try:
+        import io
         # Encode frame as JPEG for Telegram
         _, buffer = cv2.imencode('.jpg', viz_frame)
         image_bytes = buffer.tobytes()
@@ -109,15 +112,19 @@ Fight Detected: {'Yes' if alert_data.get('fight_detected') else 'No'}
 Stampede Detected: {'Yes' if alert_data.get('stampede') else 'No'}
         """.strip()
         
+        photo_stream = io.BytesIO(image_bytes)
+        photo_stream.name = f"alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+        
         # Send photo to Telegram
         await telegram_bot.send_photo(
             chat_id=telegram_chat_id,
-            photo=InputFile(image_bytes, filename=f"alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"),
+            photo=photo_stream,
             caption=caption
         )
-        print("Telegram alert sent successfully!")
+        print("Telegram alert photo sent successfully!")
     except Exception as e:
         print(f"Failed to send Telegram alert: {e}")
+        traceback.print_exc()
 
 @app.post("/demo")
 async def demo_endpoint():
@@ -200,10 +207,11 @@ async def process_single_frame(frame, camera_id="test_cam"):
         current_time = time.time()
         alert_level = alert_data.get("alert_level", "SAFE")
         
-        # For WARNING, DANGER, CRITICAL: send immediately every time
+        # For WARNING, DANGER, CRITICAL: send at most once every 3 seconds to avoid rate limiting
         if alert_level in ["WARNING", "DANGER", "CRITICAL"]:
-            await send_telegram_alert(viz_frame, alert_data)
-            last_telegram_alert_time = current_time
+            if current_time - last_telegram_alert_time >= 3:
+                await send_telegram_alert(viz_frame, alert_data)
+                last_telegram_alert_time = current_time
         # For SAFE: send only every 15 seconds
         elif alert_level == "SAFE":
             if current_time - last_safe_alert_time >= 15:
@@ -275,31 +283,63 @@ async def stream_camera():
     
     async def event_generator():
         global previous_frame
-        cap = cv2.VideoCapture(0)
-        
-        if not cap.isOpened():
-            yield f"data: {{\"error\": \"Cannot open camera. Please ensure your webcam is connected and not in use.\"}}\n\n"
-            return
-        
+        cap = None
+        has_hardware_cam = False
+        try:
+            cap = cv2.VideoCapture(0)
+            has_hardware_cam = cap.isOpened()
+        except Exception:
+            has_hardware_cam = False
+
+        sim_step = 0
         try:
             while True:
-                ret, frame = cap.read()
-                if not ret:
-                    yield f"data: {{\"error\": \"Failed to read frame from camera.\"}}\n\n"
-                    continue
-                
+                frame = None
+                if has_hardware_cam and cap is not None:
+                    ret, f = cap.read()
+                    if ret and f is not None:
+                        frame = f
+                    else:
+                        has_hardware_cam = False
+
+                if frame is None:
+                    # Simulated crowd frame for Docker environments where host webcam is not mapped
+                    import math
+                    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    frame[:] = (20, 24, 35)
+
+                    sim_step = (sim_step + 1) % 360
+                    cx1 = int(320 + 120 * math.sin(math.radians(sim_step * 2)))
+                    cy1 = int(240 + 50 * math.cos(math.radians(sim_step * 2)))
+                    cx2 = int(240 + 80 * math.cos(math.radians(sim_step * 3)))
+                    cy2 = int(270 + 40 * math.sin(math.radians(sim_step * 3)))
+                    cx3 = int(420 + 90 * math.sin(math.radians(sim_step)))
+                    cy3 = int(220 + 60 * math.cos(math.radians(sim_step)))
+
+                    for (cx, cy) in [(cx1, cy1), (cx2, cy2), (cx3, cy3)]:
+                        cv2.circle(frame, (cx, cy - 30), 16, (210, 210, 210), -1)
+                        cv2.rectangle(frame, (cx - 14, cy - 14), (cx + 14, cy + 35), (170, 150, 110), -1)
+                        cv2.line(frame, (cx - 10, cy + 35), (cx - 12, cy + 65), (130, 130, 130), 3)
+                        cv2.line(frame, (cx + 10, cy + 35), (cx + 12, cy + 65), (130, 130, 130), 3)
+
+                    cv2.putText(frame, "LIVE SIMULATION FEED", (20, 40),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 212, 255), 2)
+                    cv2.putText(frame, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), (20, 70),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (160, 160, 160), 1)
+
                 alert = await process_single_frame(frame, "live_cam_01")
                 import json
                 yield f"data: {json.dumps(alert)}\n\n"
-                
-                # Small delay to control frame rate
+
                 import asyncio
-                await asyncio.sleep(0.1)
-                
+                await asyncio.sleep(0.15)
+
         except Exception as e:
-            yield f"data: {{\"error\": \"Stream error: {str(e)}\"}}\n\n"
+            import json
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
         finally:
-            cap.release()
+            if cap is not None:
+                cap.release()
     
     return StreamingResponse(
         event_generator(),

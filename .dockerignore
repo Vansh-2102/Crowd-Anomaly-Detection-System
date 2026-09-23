@@ -1,0 +1,10 @@
+.git
+.gitignore
+.venv
+crowd-anomaly-frontend/node_modules
+crowd-anomaly-frontend/dist
+crowd-anomaly-backend/target
+crowd-anomaly-ml/venv
+crowd-anomaly-ml/__pycache__
+*.md
+.vscode

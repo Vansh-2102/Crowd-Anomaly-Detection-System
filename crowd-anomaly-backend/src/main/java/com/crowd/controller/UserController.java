@@ -12,8 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -21,6 +19,13 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create user")
+    public ResponseEntity<UserDto> createUser(@jakarta.validation.Valid @RequestBody com.crowd.dto.RegisterRequest request) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(userService.createUser(request));
+    }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
